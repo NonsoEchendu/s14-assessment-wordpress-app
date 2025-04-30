@@ -8,30 +8,114 @@ on:
 
 jobs:
   deploy:
+    name: Deploy latest main
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout!v4
+        uses: actions/checkout@v4
 
       - name: Deploy to server
+        id: deploy_step
         uses: appleboy/ssh-action@master
         with: 
             host: ${{ secrets.SERVER_HOST }}
             username: ${{ secrets.SERVER_USERNAME }}
-            key: ${{ secrets.SSH_KEY }}
-            #password: ${{ secrets.SERVER_PASSWORD }}
+            password: ${{ secrets.SERVER_PASSWORD }}
             script: |
+              echo "Deploying latest main branch..."
+
               cd ~/s14-assessment-wordpress-app
 
-              #pull the latest changes
+              # fetch the latest changes
+              git fetch origin main
               git checkout main
-              git pull origin main
+              git reset --hard origin/main
 
               #pull latest image versions from docker-compose file
+              echo "Running docker compose pull..."
               docker compose pull
 
               #stop and remove any existing and running containers and networks
+              echo "Stopping current containers..."
               docker compose down --remove-orphans
 
               # restart the services using the updated docker-compose.yml
+              echo "Starting new containers..."
               docker compose up -d
+
+              echo "Deployment script finished."
+
+      - name: Verify deployment
+        id: verify_step
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            echo "Verifying deployment..."
+            
+            cd ~/s14-assessment-wordpress-app
+            
+            # wait for services to stabilize
+            sleep 30
+
+            echo "Checking for exited containers..."
+            # get the raw output of the command 
+            EXITED_CONTAINERS_RAW=$(docker compose ps --services --filter "status=exited")
+            echo "Raw exited containers output:"
+            echo "$EXITED_CONTAINERS_RAW"
+
+            # Check if the raw output string is NOT empty
+            if [ -n "$EXITED_CONTAINERS_RAW" ]; then
+              echo "::error::Deployment verification failed - exited containers found"
+              docker compose ps --services --filter "status=exited"
+              exit 1
+            fi
+
+            echo "Deployment verified successfully"
+            exit 0
+      
+      - name: Create Release Tag
+        if: steps.verify_step.outcome == 'success' && github.event_name == 'push'
+        run: |
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          SHA_SHORT=$(echo ${{ github.sha }} | cut -c 1-8)
+          TAG_NAME="deploy-$TIMESTAMP-$SHA_SHORT"
+          echo "Creating tag: $TAG_NAME"
+
+          # Check if the tag already exists locally before creating/pushing
+          if git tag -l $TAG_NAME | grep -q $TAG_NAME; then
+            echo "Tag $TAG_NAME already exists locally."
+          else
+            git tag $TAG_NAME ${{ github.sha }}
+            echo "Tag $TAG_NAME created locally for commit ${{ github.sha }}."
+          fi
+
+          # Push the tag to the remote
+          git push origin $TAG_NAME || { echo "Warning: Failed to push tag $TAG_NAME. It might already exist on the remote." ; }
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Slack notification on success
+        if: steps.verify_step.outcome == 'success'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "✅ Deployment Successful\nProject: `${{ github.repository }}`\nBranch: `${{ github.ref_name }}`\nCommit: `${{ github.sha }}` (<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|View Commit>)\nTriggered by: `${{ github.actor }}`\nWorkflow Run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Send Slack notification on failure
+        if: steps.deploy_step.outcome == 'failure' || steps.verify_step.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "❌ Deployment Failed\nProject: `${{ github.repository }}`\nBranch: `${{ github.ref_name }}`\nCommit: `${{ github.sha }}` (<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|View Commit>)\nTriggered by: `${{ github.actor }}`\nWorkflow Run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

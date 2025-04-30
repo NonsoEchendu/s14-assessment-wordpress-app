@@ -60,10 +60,19 @@ jobs:
             # wait for services to stabilize
             sleep 30
 
-            # Check if all containers are running
-            FAILED_CONTAINERS=$(docker compose ps --services --filter "status=exited" | wc -l)
+            echo "Checking for exited containers..."
+            # Print the raw output of the command before counting
+            EXITED_CONTAINERS_RAW=$(docker compose ps --services --filter "status=exited")
+            echo "Raw exited containers output:"
+            echo "$EXITED_CONTAINERS_RAW" # Print the raw output
+
+            # Count the number of lines in the raw output
+            FAILED_CONTAINERS=$(echo "$EXITED_CONTAINERS_RAW" | wc -l)
+
+            echo "Count of exited containers: $FAILED_CONTAINERS" # Print the count
+
             if [ $FAILED_CONTAINERS -gt 0 ]; then
-              echo "::error::Deployment verification failed - some containers exited"
+              echo "::error::Deployment verification failed - $FAILED_CONTAINERS containers exited"
               exit 1
             fi
 

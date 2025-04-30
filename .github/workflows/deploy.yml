@@ -38,7 +38,7 @@ jobs:
 
       - name: Send Slack notification on success
         #run only if the deploy step succeeded AND the webhook URL is set
-        if: steps.deploy_step.outcome == 'success' && secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.deploy_step.outcome == 'success'
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -50,7 +50,7 @@ jobs:
       
       - name: Send Slack notification on failure
         #run only if the deploy step failed AND the webhook URL is set
-        if: steps.deploy_step.outcome == 'failure' && secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.deploy_step.outcome == 'failure'
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |

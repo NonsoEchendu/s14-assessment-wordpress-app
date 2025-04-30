@@ -61,16 +61,15 @@ jobs:
             sleep 30
 
             echo "Checking for exited containers..."
-            # Print the raw output of the command before counting
+            # get the raw output of the command 
             EXITED_CONTAINERS_RAW=$(docker compose ps --services --filter "status=exited")
             echo "Raw exited containers output:"
-            echo "$EXITED_CONTAINERS_RAW" # Print the raw output
+            echo "$EXITED_CONTAINERS_RAW"
 
             # Check if the raw output string is NOT empty
             if [ -n "$EXITED_CONTAINERS_RAW" ]; then
               echo "::error::Deployment verification failed - exited containers found"
-              # You could optionally add a command here to list the names again for the error message
-              # docker compose ps --services --filter "status=exited"
+              docker compose ps --services --filter "status=exited"
               exit 1
             fi
 

@@ -1,0 +1,32 @@
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+
+  wordpress:
+    image: wordpress:latest
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8000:80"
+    restart: always
+    env_file:
+      - ./.env
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - app-network
+
+volumes:
+  db_data: {}
+  wordpress_data: {}
+
+networks:
+  app-network:
+    driver: bridge

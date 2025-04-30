@@ -8,6 +8,7 @@ on:
 
 jobs:
   deploy:
+    name: Deploy latest main
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -21,24 +22,78 @@ jobs:
             username: ${{ secrets.SERVER_USERNAME }}
             password: ${{ secrets.SERVER_PASSWORD }}
             script: |
+              echo "Deploying latest main branch..."
+
               cd ~/s14-assessment-wordpress-app
 
-              #pull the latest changes
+              # fetch the latest changes
+              git fetch origin main
               git checkout main
-              git pull origin main
+              git reset --hard origin/main
 
               #pull latest image versions from docker-compose file
+              echo "Running docker compose pull..."
               docker compose pull
 
               #stop and remove any existing and running containers and networks
+              echo "Stopping current containers..."
               docker compose down --remove-orphans
 
               # restart the services using the updated docker-compose.yml
+              echo "Starting new containers..."
               docker compose up -d
 
+              echo "Deployment script finished."
+
+      - name: Verify deployment
+        id: verify_step
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            echo "Verifying deployment..."
+            
+            cd ~/s14-assessment-wordpress-app
+            
+            # wait for services to stabilize
+            sleep 30
+
+            # Check if all containers are running
+            FAILED_CONTAINERS=$(docker compose ps --services --filter "status=exited" | wc -l)
+            if [ $FAILED_CONTAINERS -gt 0 ]; then
+              echo "::error::Deployment verification failed - some containers exited"
+              exit 1
+            fi
+
+            echo "Deployment verified successfully"
+            exit 0
+      
+      - name: Create Release Tag
+        if: steps.verify_step.outcome == 'success' && github.event_name == 'push'
+        run: |
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          SHA_SHORT=$(echo ${{ github.sha }} | cut -c 1-8)
+          TAG_NAME="deploy-$TIMESTAMP-$SHA_SHORT"
+          echo "Creating tag: $TAG_NAME"
+
+          # Check if the tag already exists locally before creating/pushing
+          if git tag -l $TAG_NAME | grep -q $TAG_NAME; then
+            echo "Tag $TAG_NAME already exists locally."
+          else
+            git tag $TAG_NAME ${{ github.sha }}
+            echo "Tag $TAG_NAME created locally for commit ${{ github.sha }}."
+          fi
+
+          # Push the tag to the remote
+          git push origin $TAG_NAME || { echo "Warning: Failed to push tag $TAG_NAME. It might already exist on the remote." ; }
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Send Slack notification on success
-        #run only if the deploy step succeeded AND the webhook URL is set
-        if: steps.deploy_step.outcome == 'success'
+        if: steps.verify_step.outcome == 'success' && ${{ secrets.SLACK_WEBHOOK_URL }} != ''
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -49,8 +104,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       
       - name: Send Slack notification on failure
-        #run only if the deploy step failed AND the webhook URL is set
-        if: steps.deploy_step.outcome == 'failure'
+        if: steps.deploy_step.outcome == 'failure' || steps.verify_step.outcome == 'failure' && secrets.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |

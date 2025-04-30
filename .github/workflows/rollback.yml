@@ -1,0 +1,14 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_tag:
+        description: 'Git tag to roll back to (leave empty for standard deploy)'
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    

@@ -32,5 +32,7 @@ jobs:
               #stop and remove any existing and running containers and networks
               docker compose down --remove-orphans
 
+              sleep 2
+
               # restart the services using the updated docker-compose.yml
               docker compose up -d

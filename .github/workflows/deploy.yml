@@ -66,13 +66,11 @@ jobs:
             echo "Raw exited containers output:"
             echo "$EXITED_CONTAINERS_RAW" # Print the raw output
 
-            # Count the number of lines in the raw output
-            FAILED_CONTAINERS=$(echo "$EXITED_CONTAINERS_RAW" | wc -l)
-
-            echo "Count of exited containers: $FAILED_CONTAINERS" # Print the count
-
-            if [ $FAILED_CONTAINERS -gt 0 ]; then
-              echo "::error::Deployment verification failed - $FAILED_CONTAINERS containers exited"
+            # Check if the raw output string is NOT empty
+            if [ -n "$EXITED_CONTAINERS_RAW" ]; then
+              echo "::error::Deployment verification failed - exited containers found"
+              # You could optionally add a command here to list the names again for the error message
+              # docker compose ps --services --filter "status=exited"
               exit 1
             fi
 

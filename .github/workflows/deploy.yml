@@ -29,6 +29,8 @@ jobs:
               #pull latest image versions from docker-compose file
               docker compose pull
 
+              docker compose stop
+
               #stop and remove any existing and running containers and networks
               docker compose down --remove-orphans
 

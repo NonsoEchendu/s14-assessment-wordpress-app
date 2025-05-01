@@ -8,13 +8,57 @@ on:
         required: true
         type: string
 
+  repository_dispatch:
+    types: [ automated-rollback ]
+
 jobs:
   rollback_app:
-    name: Rollback to ${{ github.event.inputs.rollback_tag }}
+    name: Rollback Application
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'repository_dispatch' && github.event.action == 'automated-rollback')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Determine Rollback Tag
+        id: determine_tag_step
+        run: |
+          ROLLBACK_TAG=""
+          TRIGGER_TYPE="${{ github.event_name }}"
+
+          if [[ "$TRIGGER_TYPE" == "workflow_dispatch" ]]; then
+            # manual trigger: use the input tag
+            ROLLBACK_TAG="${{ github.event.inputs.rollback_tag }}"
+            echo "Manual rollback triggered. Using tag: $ROLLBACK_TAG"
+          elif [[ "$TRIGGER_TYPE" == "repository_dispatch" && "${{ github.event.action }}" == "automated-rollback" ]]; then
+            # automated trigger: find the last successful deployment tag
+            echo "Automated rollback triggered by deployment failure."
+
+            # fetch tags to ensure we have the latest tag info
+            git fetch --all --tags
+
+            # find the latest two tags starting with 'deploy-' and sort by committer date (most recent first)
+            # the second tag in the sorted list will be the previous successful deploy tag
+            LAST_TWO_DEPLOY_TAGS=$(git tag --sort=-committerdate | grep '^deploy-' | head -n 2)
+
+            if echo "$LAST_TWO_DEPLOY_TAGS" | wc -l | grep -q '^2$'; then
+              # Get the second tag (the previous one)
+              PREVIOUS_TAG=$(echo "$LAST_TWO_DEPLOY_TAGS" | tail -n 1)
+              ROLLBACK_TAG="$PREVIOUS_TAG"
+              echo "Last successful deploy tag found: $ROLLBACK_TAG"
+            else
+              echo "Error: Could not determine the previous successful deploy tag."
+              echo "Found deploy tags:"
+              echo "$LAST_TWO_DEPLOY_TAGS"
+              exit 1 
+            fi
+          else
+            echo "Error: Unknown trigger or action type."
+            exit 1
+          fi
+
+          # export the determined tag as an environment variable for subsequent steps
+          echo "ROLLBACK_TAG=$ROLLBACK_TAG" >> $GITHUB_ENV
 
       - name: Perform rollback on server
         id: rollback_step
@@ -24,7 +68,7 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            ROLLBACK_TAG=${{ github.event.inputs.rollback_tag }}
+            ROLLBACK_TAG="${{ env.ROLLBACK_TAG }}"
 
             echo "Attempting to rollback to tag: $ROLLBACK_TAG"
 
@@ -33,8 +77,8 @@ jobs:
             # Ensures the server's local git clone has all tags from the remote
             git fetch --all --tags
 
-            # switch files in current dir to match state of specified tag
-            git checkout $ROLLBACK_TAG || { echo "Error: Tag $ROLLBACK_TAG not found on server's clone. Ensure the tag was pushed and fetched." ; exit 1; }
+            # checkout the specific tag
+            git checkout $ROLLBACK_TAG || { echo "Error: Tag $ROLLBACK_TAG not found or checkout failed." ; exit 1; }
 
             echo "Running docker compose pull..."
             docker compose pull || { echo "Error: docker compose pull failed." ; exit 1; }

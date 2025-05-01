@@ -83,20 +83,23 @@ jobs:
           SHA_SHORT=$(echo ${{ github.sha }} | cut -c 1-8)
           TAG_NAME="deploy-$TIMESTAMP-$SHA_SHORT"
           echo "Creating tag: $TAG_NAME"
-
-          # Check if the tag already exists locally before creating/pushing
           if git tag -l $TAG_NAME | grep -q $TAG_NAME; then
             echo "Tag $TAG_NAME already exists locally."
           else
             git tag $TAG_NAME ${{ github.sha }}
             echo "Tag $TAG_NAME created locally for commit ${{ github.sha }}."
           fi
-
-          # Push the tag to the remote
           git push origin $TAG_NAME || { echo "Warning: Failed to push tag $TAG_NAME. It might already exist on the remote." ; }
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger Automated Rollback Workflow
+        if: steps.verify_step.outcome == 'failure'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: automated-rollback
 
       - name: Send Slack notification on success
         if: steps.verify_step.outcome == 'success'
@@ -115,7 +118,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "❌ Deployment Failed\nProject: `${{ github.repository }}`\nBranch: `${{ github.ref_name }}`\nCommit: `${{ github.sha }}` (<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|View Commit>)\nTriggered by: `${{ github.actor }}`\nWorkflow Run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+              "text": "❌ Deployment Failed (Automated Rollback Triggered)\nProject: `${{ github.repository }}`\nBranch: `${{ github.ref_name }}`\nCommit: `${{ github.sha }}` (<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|View Commit>)\nTriggered by: `${{ github.actor }}`\nWorkflow Run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\nError: See workflow run logs for details."
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

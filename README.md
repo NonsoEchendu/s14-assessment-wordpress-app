@@ -140,15 +140,11 @@ With more time, the following areas could be improved:
 
 ### Deployed WordPress Application
 
-![Screenshot of Deployed WordPress App](link-to-your-wordpress-screenshot.png)
-
-*(Replace this text and image with a screenshot of your running WordPress site)*
+![website-live](https://github.com/user-attachments/assets/7c2ae3b0-3f11-4488-b118-2ec34b500d0a)
 
 ### Grafana Monitoring Dashboard
 
-![Screenshot of Grafana Monitoring Dashboard](link-to-your-grafana-screenshot.png)
-
-*(Replace this text and image with a screenshot of your Grafana dashboard showing metrics)*
+![grafana-dashboard-system-metrics](https://github.com/user-attachments/assets/597ce025-8cd2-4743-b467-0439ef4933ad)
 
 ## License
 

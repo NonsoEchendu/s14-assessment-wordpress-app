@@ -1,0 +1,49 @@
+**** HOW TO RESTORE FROM A BACKUP *****
+
+Step 1: Stop The Application. 
+        Very important to stop the wordpress and mysql database containers before doing a restore to prevent data corruption
+        Run these commands: 
+            cd ~/s14-assessment-wordpress-app
+            docker compose down
+
+Step 2: Choose The Backup:
+        Locate the backup you want to restore from the backup directory. 
+        Location of the backup directory: ~/wordpress_backups/
+        Backups are stored in timestamped folders (e.g. ~/wordpress_backups/YYYYMMDDHHMMSS/).
+        Note the full path to the chosen backup folder (e.g., /home/ubuntu/wordpress_backups/20250430215735)
+
+Step 3: Restore Wordpress Files:
+        The WordPress files are in the `wordpress_data` named volume. 
+        You need to extract the `wordpress_files.tar.gz` from the backup into this volume. And the safest way with named volumes is using a temporary container.
+        To do this, run a temporary container that mounts the `wordpress_data` volume and the backup file:
+        Run this command (note: change the wordpress_backups timestamp path to the path of the backup you want to restore):
+            docker run --rm \
+              -v wordpress_data:/data \
+              -v /home/ubuntu/wordpress_backups/20250430215735/wordpress_files.tar.gz:/backup/files.tar.gz:ro \
+              ubuntu:latest \
+              bash -c "rm -rf /data/* /data/.[!.]* && tar -xzf /backup/files.tar.gz -C /data --strip-components=1"
+
+        The above command clears the current volume data and extracts the backup files into it.
+
+Step 4: Retore MySQL Database:
+        The database data is in the docker volume `db_data`. You need to import the database.sql file from the backup into this volume using the MySQL client. 
+        Like was done with rrestore wordpress step, use a temporary container to mount the database volume.
+        Run this command (note: replace DB_NAME, DB_USER, DB_PASSWORD with the values from the .env file. and change the wordpress_backups timestamp path to the path of the backup you want to restore):
+            docker run --rm \
+              -v db_data:/var/lib/mysql \
+              -v /home/ubuntu/wordpress_backups/20250430215735/database.sql:/backup/database.sql:ro \
+              mysql:5.7 \
+              bash -c "
+                sleep 5; # Give MySQL a moment to start in the temp container
+                mysql -u'$DB_USER' -p'$DB_PASSWORD' '$DB_NAME' < /backup/database.sql
+              "
+        The aboove command starts a temporary MySQL instance using the volume data and imports the SQL dump into the specified database.
+
+Step 5: Start the application:
+        Navigate back to the docker compose directory and start the services: 
+            cd ~/s14-assessment-wordpress-app
+            docker compose up -d
+
+Step 6: Verify:
+        Check the WordPress site in a web browser to confirm that the data and files have been restored correctly and the application is functioning as expected.
+

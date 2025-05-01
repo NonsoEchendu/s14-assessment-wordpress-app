@@ -149,7 +149,7 @@ For a guide on how to setup these monitoring tools, checkout [this article](http
 
 With more time, the following areas could be improved:
 
-* **More Robust CI Pipeline:** Implement a separate CI workflow to run code quality checks, linting, and unit tests on development/feature branches before merging to `main`.
+* **More Robust CI Pipeline:** Improve the CI workflow to run code quality checks, linting, and unit tests on development/feature branches before merging to `main`.
 * **Enhanced Deployment Verification:** Add more comprehensive application-level health checks in the deployment pipeline (e.g., checking for a successful HTTP response from the WordPress site, database connection checks from within the application container).
 * **Automated Rollback on Verification Failure:** Modify the pipeline to automatically trigger the rollback workflow if the deployment verification step fails.
 * **More Comprehensive Rollback:** Develop a more robust rollback strategy that includes handling data volume snapshots or database point-in-time recovery if needed, alongside code reversion.

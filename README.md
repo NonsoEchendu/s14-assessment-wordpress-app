@@ -7,7 +7,6 @@ This project demonstrates a Dockerized WordPress application with a CI/CD pipeli
 - [Project Description](#project-description)
 - [Setup Guide](#setup-guide)
     - [Prerequisites](#prerequisites)
-    - [Local Setup](#local-setup)
     - [Server Setup](#server-setup)
     - [GitHub Actions Configuration](#github-actions-configuration)
     - [Nginx and SSL Setup](#nginx-and-ssl-setup)
@@ -34,23 +33,8 @@ Follow these steps to set up and deploy the application.
 * An Ubuntu server instance (e.g., AWS EC2) with SSH access.
 * Docker and Docker Compose installed on your Ubuntu server.
 * An SSH key pair for secure access to your server.
-* A domain name pointing to your server's IP address (e.g., `s14.michaeloxo.tech` and `monitoring.s14.michaeloxo.tech`).
-* A Slack workspace and webhook URL (optional, for notifications).
-
-### Local Setup
-
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/NonsoEchendu/s14-assessment-wordpress-app.git](https://github.com/NonsoEchendu/s14-assessment-wordpress-app.git)
-    cd s14-assessment-wordpress-app
-    ```
-
-2.  **Configure environment variables:**
-    Create a `.env` file in the project root directory from the `.env.example` file and fill in your desired database credentials.
-
-    ```bash
-    cp .env.example .env
-    ```
+* A domain name pointing to your server's IP address (e.g., `your-website.com` and `monitoring.your-website.com`).
+* A Slack workspace and webhook URL (for notifications).
 
 ### Server Setup
 
@@ -59,11 +43,31 @@ Follow these steps to set up and deploy the application.
     ssh -i your-key-pair.pem ubuntu@your-ip-address
     ```
 2.  **Ensure Docker and Docker Compose are installed.** If not, follow the [official Docker documentation for Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
-3.  **Create a directory** on the server for your application code:
+3.  **Clone the repository:**
     ```bash
-    mkdir ~/s14-assessment-wordpress-app
+    git clone [https://github.com/NonsoEchendu/s14-assessment-wordpress-app.git](https://github.com/NonsoEchendu/s14-assessment-wordpress-app.git)
+    cd s14-assessment-wordpress-app
     ```
-4.  **Place your `.env` file** on the server within the application directory.
+
+4.  **Configure environment variables:**
+    Create a `.env` file in the project root directory from the `.env.example` file and fill in your desired database credentials.
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    The .env file would look like this:
+    ```bash
+    MYSQL_ROOT_PASSWORD=mysql_root_password
+    MYSQL_DATABASE=wordpress
+    MYSQL_USER=wordpress
+    MYSQL_PASSWORD=wordpress_db_password
+    
+    WORDPRESS_DB_HOST=db:3306
+    WORDPRESS_DB_USER=${MYSQL_USER}
+    WORDPRESS_DB_PASSWORD=${MYSQL_PASSWORD}
+    WORDPRESS_DB_NAME=${MYSQL_DATABASE}
+    ```
 
 ### GitHub Actions Configuration
 
@@ -73,7 +77,7 @@ Follow these steps to set up and deploy the application.
     * `SSH_PRIVATE_KEY`: The **entire content** of the private SSH key you will use for deployment (including `-----BEGIN...-----` and `-----END...-----`).
     * `SLACK_WEBHOOK_URL`: Your Slack webhook URL. Check th
 
-2.  **Ensure Workflow Files are in `.github/workflows/`:** Verify that `deploy.yml` and `rollback.yml` (or your chosen names) are in the `.github/workflows/` directory.
+2.  **Ensure Workflow Files are in `.github/workflows/`:** Verify that `deploy.yml` and `rollback.yml` are in the `.github/workflows/` directory.
 
 3.  **Perform the initial deployment:** Push your code to the `main` branch or manually trigger the `Deploy Wordpress App` workflow in the GitHub Actions tab.
 
@@ -81,12 +85,31 @@ Follow these steps to set up and deploy the application.
 
 Configure Nginx on your Ubuntu server to act as a reverse proxy for your Dockerized WordPress application and your Grafana dashboard.
 
-1.  **Install Nginx:** `sudo apt update && sudo apt install nginx`
-2.  **Create Nginx configuration files** in `/etc/nginx/sites-available/` for your WordPress site (proxying to `http://127.0.0.1:8000`) and your monitoring dashboard (proxying to `http://127.0.0.1:3000`).
-3.  **Enable the configurations** by creating symlinks in `/etc/nginx/sites-enabled/`.
-4.  **Test Nginx config:** `sudo nginx -t`
-5.  **Install Certbot** and obtain SSL certificates for both your WordPress domain (`your-website.com`) and your monitoring subdomain (`monitoring.your-website.com`). Certbot will automatically configure Nginx for SSL. Follow the Certbot instructions for Nginx on Ubuntu.
-6.  **Reload Nginx:** `sudo systemctl reload nginx`
+1.  **Install Nginx:**
+2.  ```bash
+    sudo apt update
+    sudo apt install nginx -y
+    ```
+4.  **Copy Nginx configuration files** from `nginx.conf` to `/etc/nginx/sites-available/wordpress` for your WordPress site.
+5.  **Enable the configurations** by creating symlinks in `/etc/nginx/sites-enabled/`.
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/wordpress /etc/nginx/sites-enabled/
+   ```
+
+7.  **Test Nginx config:** `sudo nginx -t`
+8.  **Install Certbot:**
+    ```bash
+    sudo apt update
+    sudo apt install certbot python3-certbot-nginx
+    ```
+    
+9.  Obtain SSL certificates for both your WordPress domain (`your-website.com`) and your monitoring subdomain (`monitoring.your-website.com`). Certbot will automatically configure Nginx for SSL:
+    ```bash
+    sudo certbot --nginx -d your-website.com -d www.your-website.com
+    sudo certbot --nginx -d monitoring.your-website.com -d www.monitoring.your-website.com
+    ```
+    
+10.  **Reload Nginx:** `sudo systemctl reload nginx`
 
 ### Automated Backups
 
@@ -94,11 +117,13 @@ Configure Nginx on your Ubuntu server to act as a reverse proxy for your Dockeri
 2.  **Make the script executable:** `chmod +x ~/backup.sh`
 3.  **Edit the script** to ensure paths (`APP_DIR`, `BACKUP_ROOT_DIR`) and service names match your setup.
 4.  **Set up a daily cron job** to run the script: `crontab -e`, then add a line like `0 2 * * * /bin/bash /home/ubuntu/backup.sh` (adjust time and path as needed).
-5.  **Refer to the restoration guide** (either in this README or a separate document) for how to restore from these backups.
+5.  **Refer to the restoration guide** `how-to-restore-backup.txt` in the `backup` folder for how to restore from these backups.
 
 ### Monitoring Setup
 
 Ensure Prometheus, Grafana, Node Exporter, and Blackbox Exporter are installed and running on your Ubuntu server as system services or via Docker Compose.
+
+For a guide on how to setup these monitoring tools, checkout [this article](https://dev.to/nonso_echendu_001/mastering-modern-monitoring-a-comprehensive-guide-to-grafana-prometheus-and-dora-metrics-20ec) i wrote on it.
 
 1.  **Install/Configure Monitoring Services:** Follow the documentation for installing and configuring Prometheus, Grafana, Node Exporter, and Blackbox Exporter on Ubuntu.
 2.  **Configure Prometheus** (`/etc/prometheus/prometheus.yml`) to scrape metrics from Node Exporter (`localhost:9100`) and Blackbox Exporter (`localhost:9115`) using the Blackbox exporter's `/probe` endpoint to check your WordPress site.

@@ -137,12 +137,16 @@ For a guide on how to setup these monitoring tools, checkout [this article](http
 ### What Works
 
 * Dockerized WordPress and MySQL application setup using Docker Compose.
-* Automated deployment to the Ubuntu server via GitHub Actions on push to `main`.
-* Manual deployment triggering via GitHub Actions.
-* Secure deployment using SSH key authentication.
-* Manual rollback capability via a separate GitHub Actions workflow using Git tags.
+* Automated deployment of the latest `main` branch code to the Ubuntu server via GitHub Actions on push events.
+* Manual deployment triggering via GitHub Actions (`workflow_dispatch`).
+* Secure deployment using SSH key authentication instead of passwords.
+* Manual rollback capability to a specific Git tag via a separate GitHub Actions workflow (`rollback.yml`).
+* Automated rollback trigger from the deployment workflow (`deploy.yml`) to the rollback workflow (`rollback.yml`) if the deployment verification step fails.
 * Automated daily backups of WordPress files and database using a server-side script and cron.
-* Basic monitoring of server resources (CPU, Memory, Disk) and application availability (via Blackbox Exporter) using Prometheus and Grafana.
+* Basic monitoring of server resources (CPU, Memory, Disk) using Prometheus and Node Exporter.
+* Basic application availability monitoring (checking if the site is reachable) using Prometheus and Blackbox Exporter.
+* Grafana dashboard for visualizing collected metrics.
+* Grafana alert configured for high CPU usage.
 * Nginx reverse proxy serving the WordPress site and Grafana dashboard with SSL certificates managed by Certbot.
 
 ### Areas for Improvement
@@ -151,7 +155,6 @@ With more time, the following areas could be improved:
 
 * **More Robust CI Pipeline:** Improve the CI workflow to run code quality checks, linting, and unit tests on development/feature branches before merging to `main`.
 * **Enhanced Deployment Verification:** Add more comprehensive application-level health checks in the deployment pipeline (e.g., checking for a successful HTTP response from the WordPress site, database connection checks from within the application container).
-* **Automated Rollback on Verification Failure:** Modify the pipeline to automatically trigger the rollback workflow if the deployment verification step fails.
 * **More Comprehensive Rollback:** Develop a more robust rollback strategy that includes handling data volume snapshots or database point-in-time recovery if needed, alongside code reversion.
 * **Centralized Logging:** Implement a logging solution (e.g., ELK stack, Grafana Loki/Promtail) to centralize logs from Docker containers and system services.
 * **Advanced Monitoring:** Add application-specific metrics (e.g., WordPress login failures, plugin errors) using WordPress-specific exporters or custom metrics.
@@ -159,7 +162,6 @@ With more time, the following areas could be improved:
 * **Automated Backup Restoration Testing:** Periodically test the backup restoration process in a isolated environment to ensure backups are valid and restorable.
 * **Infrastructure as Code (IaC):** Use tools like Terraform or Ansible to automate server provisioning and initial setup.
 * **Secrets Management:** Integrate with a dedicated secrets management system.
-* **Database Backup Consistency:** Ensure database backups are fully consistent, potentially using `FLUSH TABLES WITH READ LOCK` or `--single-transaction` options in `mysqldump`.
 
 ## Screenshots
 
